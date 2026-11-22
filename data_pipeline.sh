@@ -78,6 +78,7 @@ aws glue create-crawler \
 
 # Run above Crawler
 # await the crawler run
+echo "Starting Crawler"
 while true; do
     STATE=$(aws glue start-crawler
         --name s3-temp-crawler
@@ -89,6 +90,7 @@ while true; do
 
     sleep 5
 done
+echo "Crawler finished"
 
 # Create redshift glue connection
 WG_NAME=$(aws redshift-serverless get-workgroup \
@@ -173,17 +175,19 @@ aws glue create-trigger \
       }
     ]'
 
+aws glue start-job-run \
+    --job-name "glue-to-s3"
 # Clean Up
 
 # Delete the IAM Role used by glue
 # The Glue Database
 # The S3 Bucket
 # The Redshift Connection
+# The glue jobs
+# The glue trigger
 
 # Leave
 # The Redshift namespace / workgroup
+# The Redshift Security Group
 # The Subnets it's on
 # The Redshift IAM Role
-
-aws iam delete \
-    --role-name RedshiftTransfer \
