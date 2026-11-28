@@ -11,12 +11,11 @@ SECURITY_GROUP_ID=$(aws ec2 create-security-group \
     --query "GroupId" \
     --output text)
 
-REDSHIFT_IAM=$(aws iam create-role \
+REDSHIFT_IAM_ARN=$(aws iam create-role \
     --role-name RedshiftETLRole \
     --assume-role-policy-document file://redshift-trust-policy.json \
     --query 'Role.Arn' \
     --output text) 
-
 
 aws iam attach-role-policy \
   --role-name RedshiftETLRole \
@@ -54,13 +53,15 @@ RTB_ID=$(aws ec2 create-route-table \
     --output text)
 
 # Might need to create a gateway endpoint here as well and put it in the route table
-aws ec2 create-vpc-endpoint \
+VPCE_ID=$(aws ec2 create-vpc-endpoint \
     --vpc-id $VPC_ID \
     --vpc-endpoint-type Gateway \
     --service-name com.amazonaws.us-west-1.s3 \
     --route-table-ids $RTB_ID \
     --tag-specifications \
         'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=redshift-s3-gateway-endpoint}]'
+    --query 'VpcEndpoint.VpcEndpointId' \
+    --output text)
 
 aws ec2 associate-route-table \
     --subnet-id $SUBNET_A_ID \
@@ -76,8 +77,8 @@ aws redshift-serverless create-namespace \
     --db-name dev \
     --admin-username "$REDSHIFT_USER" \
     --admin-user-password "$REDSHIFT_PASS" \
-    --iam-roles "$REDSHIFT_IAM" \
-    --default-iam-role-arn "$REDSHIFT_IAM"
+    --iam-roles "$REDSHIFT_IAM_ARN" \
+    --default-iam-role-arn "$REDSHIFT_IAM_ARN"
 
 aws redshift-serverless create-workgroup \
     --workgroup-name serverless-wg \
@@ -89,5 +90,12 @@ aws redshift-serverless create-workgroup \
     --no-enhanced-vpc-routing
 
 # The data pipeline script needs these
-echo "SUBNET_A_ID=\"$SUBNET_A_ID\"" >> ./variables.conf
-echo "SECURITY_GROUP_ID=\"$SECURITY_GROUP_ID\"" >> ./variables.conf
+echo "SUBNET_A_ID=\"$SUBNET_A_ID\"" > ./subnet_sg.conf
+echo "SUBNET_B_ID=\"$SUBNET_B_ID\"" >> ./subnet_sg.conf
+echo "SECURITY_GROUP_ID=\"$SECURITY_GROUP_ID\"" >> ./subnet_sg.conf
+
+# These are for cleaning up Redshift
+echo "REDSHIFT_IAM_ARN=\"$REDSHIFT_IAM_ARN\"" > clean_redshift.conf
+echo "REDSHIFT_IAM_NAME=\"${REDSHIFT_IAM_ARN##*/}\"" >> clean_redshift.conf
+echo "RTB_ID=\"$RTB_ID\"" >> clean_redshift.conf
+echo "VPCE_ID=\"$VPCE_ID\"" >> clean_redshift.conf

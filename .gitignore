@@ -1,2 +1,5 @@
 *.txt
 *.csv
+subnet_sg.conf
+clean_redshift.conf
+my_vars.conf
